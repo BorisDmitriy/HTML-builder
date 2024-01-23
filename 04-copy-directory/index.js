@@ -1,49 +1,32 @@
 const path = require('path');
-const fs = require('fs');
+const fs = require('fs').promises;
 
 const inputPath = path.join(__dirname, 'files');
 const outputPath = path.join(__dirname, 'files-copy');
 
-fs.readdir(inputPath, (err, files) => {
-  if (err) {
-    console.log(err);
+async function removeAndCopyFiles(source, target) {
+  const targetDirectory = path.resolve(target);
+
+  await fs.mkdir(targetDirectory, { recursive: true });
+
+  const removingFiles = await fs.readdir(target);
+  for (const file of removingFiles) {
+    await fs.unlink(path.join(target, file));
   }
 
-  let inputFiles = files;
+  const files = await fs.readdir(source);
 
-  fs.mkdir(outputPath, { recursive: true }, (err) => {
-    if (err) {
-      console.log(err);
+  for (const file of files) {
+    const currentSource = path.join(source, file);
+    const currentTarget = path.join(targetDirectory, file);
+    const stats = await fs.stat(currentSource);
+
+    if (stats.isDirectory()) {
+      await removeAndCopyFiles(currentSource, currentTarget);
+    } else {
+      await fs.copyFile(currentSource, currentTarget);
     }
+  }
+}
 
-    files.forEach((file) => {
-      fs.copyFile(
-        path.join(inputPath, file),
-        path.join(outputPath, file),
-        (err) => {
-          if (err) {
-            console.log(err);
-          }
-        },
-      );
-    });
-  });
-
-  fs.readdir(outputPath, (err, files) => {
-    if (err) {
-      console.log(err);
-    }
-
-    let outputFiles = files;
-
-    outputFiles.forEach((outputFile, index) => {
-      if (outputFile != inputFiles[index]) {
-        fs.unlink(path.join(outputPath, outputFile), (err) => {
-          if (err) {
-            console.log(err);
-          }
-        });
-      }
-    });
-  });
-});
+removeAndCopyFiles(inputPath, outputPath);
